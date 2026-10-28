@@ -35,7 +35,7 @@ private const val EXT_ID = "maxauth@freemax.local"
 private const val NATIVE_APP = "browser"
 private const val LOGIN_URL = "https://web.max.ru"
 
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "WrongThread")
 @Composable
 fun GeckoLoginScreen(
     onAuthSaved: () -> Unit,

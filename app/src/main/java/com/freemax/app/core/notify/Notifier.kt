@@ -3,6 +3,7 @@ package com.freemax.app.core.notify
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -61,6 +62,7 @@ class Notifier @Inject constructor(
      * Показывает уведомление о сообщении. [chatId] нужен для перехода в чат,
      * [muted] — тихий чат (уведомление не показываем).
      */
+    @SuppressLint("MissingPermission")
     fun notifyMessage(
         chatId: Long,
         chatTitle: String,

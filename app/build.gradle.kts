@@ -127,6 +127,12 @@ android {
         compose = true
         buildConfig = true
     }
+
+    lint {
+        // AGP 8.7 + Kotlin 2.1: this lifecycle detector crashes lint with
+        // "Found class ... but interface was expected". Not a project issue.
+        disable += "NullSafeMutableLiveData"
+    }
 }
 
 dependencies {
