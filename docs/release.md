@@ -59,7 +59,9 @@ otherwise Android will not install the new APK over the old one.
   flow (`PasteTokenScreen`): get the token from `web.max.ru` → DevTools →
   `localStorage.getItem('__oneme_auth')`.
 - **No debug hooks.** `DebugNightHook` and the adb-only test extras live in
-  `app/src/debug` and are not part of the release APK.
+  `app/src/debug` and are not part of the release APK. In debug builds they are
+  reachable only through the non-exported `DebugActivity` and require the
+  explicit `freemax_test_enable=true` extra.
 - `minifyEnabled` and `shrinkResources` are on. `Log.d`/`Log.v` are stripped,
   because payload logs may contain tokens or messages. Useful `Log.i/e`
   remain.

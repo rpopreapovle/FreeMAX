@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Debug-only. Не экспортируется: запуск только через adb shell
+             с явным extra freemax_test_enable=true. -->
+        <activity
+            android:name=".DebugActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.FreeMAX" />
+    </application>
+
+</manifest>

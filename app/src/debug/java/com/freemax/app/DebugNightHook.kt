@@ -21,7 +21,8 @@ import com.freemax.app.data.repository.UploadRepository
  * Активируется только если в intent явно переданы extras вида freemax_test_*.
  *
  * Примеры:
- *   adb shell am start -n com.freemax.app/.MainActivity \
+ *   adb shell am start -n com.freemax.app/.DebugActivity \
+ *     --ez freemax_test_enable true \
  *     --es freemax_test_send_chat "-1000000000000" \
  *     --es freemax_test_send_text "ночной смоук"
  */
@@ -40,6 +41,11 @@ class DebugNightHook : DebugHook {
         localCache: LocalCache,
         upload: UploadRepository
     ) {
+        // Defense in depth: даже если activity случайно окажется доступной,
+        // без debug-сборки и явного согласия хук ничего не делает.
+        if (!BuildConfig.DEBUG) return
+        if (!intent.getBooleanExtra("freemax_test_enable", false)) return
+
         val sendChat = intent.getStringExtra("freemax_test_send_chat")
         val sendPreset = intent.getStringExtra("freemax_test_send_preset")
         val uploadChat = intent.getStringExtra("freemax_test_upload_chat")
