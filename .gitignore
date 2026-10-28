@@ -1,0 +1,25 @@
+.idea/
+.gradle/
+.kotlin/
+local.properties
+**/build/
+*.apk
+*.aab
+*.keystore
+*.jks
+*.env
+captures/
+*.hprof
+.DS_Store
+
+# release signing material (kept outside the repository, see docs/release.md)
+release.properties
+
+# local developer tools and personal bot configs are not part of the public app
+/tools/
+/dist/
+
+# maxbot local data
+tools/maxbot/config.json
+tools/maxbot/tokendump/out/
+tools/maxbot/__pycache__/
