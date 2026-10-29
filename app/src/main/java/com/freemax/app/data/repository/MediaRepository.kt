@@ -71,42 +71,75 @@ class MediaRepository @Inject constructor(
         att: Attachment,
         onProgress: (Int) -> Unit = {}
     ): LocalAttachment = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "downloads").apply { mkdirs() }
+        // Если имя известно, проверяем кэш ДО запроса ссылки: сервер может
+        // не отдать URL повторно, а файл уже лежит на устройстве.
+        att.name?.takeIf { it.isNotBlank() }?.let { rawName ->
+            val cachedName = safeName(rawName)
+            val cached = File(dir, cachedName)
+            if (cached.exists() && cached.length() > 0L &&
+                (att.size <= 0L || cached.length() == att.size)
+            ) {
+                return@withContext LocalAttachment(
+                    file = cached,
+                    mime = mimeFor(cachedName, att),
+                    name = cachedName
+                )
+            }
+        }
         val url = resolveUrl(message, att)
             ?: throw IOException("сервер не отдал ссылку на файл")
         val name = safeName(att.name ?: nameFromUrl(url) ?: defaultName(att))
-        val dir = File(context.cacheDir, "downloads").apply { mkdirs() }
         val out = File(dir, name)
+        // Уже скачано ранее — не тянем 300 МБ заново. Размер сверяем, если сервер его прислал.
+        if (out.exists() && out.length() > 0L &&
+            (att.size <= 0L || out.length() == att.size)
+        ) {
+            return@withContext LocalAttachment(file = out, mime = mimeFor(name, att), name = name)
+        }
+        if (out.exists()) out.delete()
+        val part = File(dir, "$name.part")
+        if (part.exists()) part.delete()
         android.util.Log.d(TAG, "GET $url -> ${out.absolutePath}")
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "FreeMAX/0.1")
+            .header("User-Agent", "FreeMAX/1.0")
             .build()
-        http.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
-            val body = resp.body ?: throw IOException("пустой ответ")
-            val total = body.contentLength()
-            body.byteStream().use { input ->
-                out.outputStream().use { output ->
-                    val buf = ByteArray(64 * 1024)
-                    var copied = 0L
-                    var lastPct = -1
-                    while (true) {
-                        val read = input.read(buf)
-                        if (read <= 0) break
-                        output.write(buf, 0, read)
-                        copied += read
-                        if (total > 0) {
-                            val pct = ((copied * 100) / total).toInt()
-                            if (pct != lastPct) {
-                                lastPct = pct
-                                onProgress(pct)
+        try {
+            http.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+                val body = resp.body ?: throw IOException("пустой ответ")
+                val total = body.contentLength()
+                body.byteStream().use { input ->
+                    part.outputStream().use { output ->
+                        val buf = ByteArray(64 * 1024)
+                        var copied = 0L
+                        var lastPct = -1
+                        while (true) {
+                            val read = input.read(buf)
+                            if (read <= 0) break
+                            output.write(buf, 0, read)
+                            copied += read
+                            if (total > 0) {
+                                val pct = ((copied * 100) / total).toInt()
+                                if (pct != lastPct) {
+                                    lastPct = pct
+                                    onProgress(pct)
+                                }
                             }
                         }
                     }
                 }
             }
+            if (part.length() == 0L) throw IOException("файл пустой")
+            if (!part.renameTo(out)) {
+                part.copyTo(out, overwrite = true)
+                part.delete()
+            }
+        } catch (e: Exception) {
+            try { part.delete() } catch (_: Exception) {}
+            throw e
         }
-        if (out.length() == 0L) throw IOException("файл пустой")
         LocalAttachment(out, mimeFor(name, att), name)
     }
 
@@ -174,22 +207,29 @@ class MediaRepository @Inject constructor(
             when {
                 att.isFile -> {
                     // web.max.ru: cmd(88, {fileId, chatId, messageId, itemType}).
-                    // fileId — только число: строку сервер отвергает (proto.payload).
-                    val fileId: Any = att.fileId?.toLongOrNull()?.takeIf { it != 0L }
+                    // fileId обычно число; UUID-строки сервер иногда принимает
+                    // только в другом поле/варианте itemType, поэтому пробуем
+                    // несколько форм, а не сдаёмся после первого null.
+                    val numericId = att.fileId?.toLongOrNull()?.takeIf { it != 0L }
                         ?: att.id.takeIf { it != 0L }
-                        ?: att.fileId
-                        ?: 0L
-                    val payload = mutableMapOf<String, Any?>(
-                        "fileId" to fileId,
-                        "chatId" to MsgPack.BigInt(chatId),
-                        "messageId" to MsgPack.BigInt(msgId),
-                        "itemType" to "REGULAR"
-                    )
-                    pickUrl(client.request(Opcodes.FILE_DOWNLOAD, payload, 20000)?.payload)?.let { return it }
-                    // Фолбэк: повтор с токеном вложения (сервер принимает и такой запрос).
-                    att.extra?.takeIf { it.isNotBlank() }?.let { token ->
-                        payload["token"] = token
-                        pickUrl(client.request(Opcodes.FILE_DOWNLOAD, payload, 20000)?.payload)?.let { return it }
+                    val fileIds = buildList<Any> {
+                        numericId?.let { add(it) }
+                        att.fileId?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    }.distinct()
+                    for (fileId in fileIds) {
+                        for (itemType in listOf("REGULAR", "FILE")) {
+                            val payload = mutableMapOf<String, Any?>(
+                                "fileId" to fileId,
+                                "chatId" to MsgPack.BigInt(chatId),
+                                "messageId" to MsgPack.BigInt(msgId),
+                                "itemType" to itemType
+                            )
+                            pickUrl(client.request(Opcodes.FILE_DOWNLOAD, payload, 20000)?.payload)?.let { return it }
+                            att.extra?.takeIf { it.isNotBlank() }?.let { token ->
+                                payload["token"] = token
+                                pickUrl(client.request(Opcodes.FILE_DOWNLOAD, payload, 20000)?.payload)?.let { return it }
+                            }
+                        }
                     }
                 }
                 att.isVideo -> {

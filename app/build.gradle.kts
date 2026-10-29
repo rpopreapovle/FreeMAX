@@ -56,8 +56,8 @@ android {
         applicationId = "com.freemax.app"
         minSdk = 31
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.1"
+        versionCode = 5
+        versionName = "1.0.2"
 
         // Optional speech-to-text (owner-only feature). Empty = disabled.
         // Values live in local.properties (never committed) or can be passed:

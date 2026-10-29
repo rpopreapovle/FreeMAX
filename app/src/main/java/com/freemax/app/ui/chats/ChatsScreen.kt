@@ -34,8 +34,25 @@ fun ChatsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    var lastTopChatStamp by remember { mutableStateOf<String?>(null) }
     var menuChatId by remember { mutableStateOf<Long?>(null) }
     var deleteChatId by remember { mutableStateOf<Long?>(null) }
+
+    // Ключи LazyColumn сохраняют позицию элемента: при вставке нового чата
+    // сверху список может остаться на старом элементе, и новый чат оказывается
+    // «над экраном». Если пользователь у верха — плавно доводим до нового топа.
+    LaunchedEffect(uiState.chats.firstOrNull()?.id, uiState.chats.firstOrNull()?.lastEventTime) {
+        val top = uiState.chats.firstOrNull() ?: return@LaunchedEffect
+        val stamp = "${top.id}:${top.lastEventTime}"
+        val previous = lastTopChatStamp
+        lastTopChatStamp = stamp
+        if (previous == null || previous == stamp) return@LaunchedEffect
+        if (listState.firstVisibleItemIndex <= 1 && listState.firstVisibleItemScrollOffset < 48) {
+            try {
+                listState.animateScrollToItem(0)
+            } catch (_: Exception) {}
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets.statusBars,
@@ -129,18 +146,43 @@ fun ChatsScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Офлайн-баннер: понятный текст, список при этом остаётся из кэша
-            if (!uiState.online) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Нет сети — показаны сохранённые чаты. Отправка возобновится автоматически.",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
+            // Офлайн-баннер: показываем только при реальном отсутствии сети.
+            // Реконнект сокета — отдельный нейтральный статус, не «нет сети».
+            when {
+                !uiState.networkAvailable -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Нет сети — показаны сохранённые чаты. Отправка возобновится автоматически.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+                !uiState.online -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 1.5.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Переподключение к MAX…",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
             when {
@@ -159,12 +201,12 @@ fun ChatsScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = if (uiState.online) "Пока нет чатов" else "Нет сети",
+                            text = if (uiState.networkAvailable) "Пока нет чатов" else "Нет сети",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (uiState.online) {
+                            text = if (uiState.networkAvailable) {
                                 "Начните переписку: найдите человека по имени или номеру телефона."
                             } else {
                                 "Подключитесь к интернету — чаты подгрузятся сами."
@@ -173,7 +215,7 @@ fun ChatsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-                        if (uiState.online) {
+                        if (uiState.networkAvailable) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Button(onClick = onNewChatClick) {
                                 Text("Найти собеседника")

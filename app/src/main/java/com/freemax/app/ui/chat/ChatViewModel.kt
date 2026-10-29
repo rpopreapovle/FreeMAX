@@ -64,7 +64,9 @@ data class ChatUiState(
     /** Растёт при каждой новой toast-строке — триггер для SnackbarHost. */
     val toastId: Long = 0L,
     /** Ключ вложения, которое сейчас скачивается (индикатор в пузыре). */
-    val busyAttachmentKey: String? = null
+    val busyAttachmentKey: String? = null,
+    /** Прогресс текущего скачивания 0..1 (для линейного прогресс-бара). */
+    val attachmentProgress: Float? = null
 )
 
 sealed interface HeaderTarget {
@@ -770,19 +772,26 @@ class ChatViewModel @Inject constructor(
         if (_uiState.value.busyAttachmentKey != null) return
         val key = attachmentKey(message.id, att)
         val label = attachmentLabel(att)
-        _uiState.update { it.copy(busyAttachmentKey = key) }
+        _uiState.update { it.copy(busyAttachmentKey = key, attachmentProgress = 0f) }
         showToast("Скачиваю «$label»…")
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val local = mediaRepository.fetch(message, att) { pct ->
-                    if (pct > 0 && pct < 100 && pct % 10 == 0) showToast("Скачиваю «$label»… $pct%")
+                val downloaded = mediaRepository.fetch(message, att) { pct ->
+                    _uiState.update { it.copy(attachmentProgress = pct / 100f) }
                 }
-                _uiState.update { it.copy(busyAttachmentKey = null) }
-                mediaRepository.open(local)
-                showToast("Открываю «${local.name}»")
+                _uiState.update { it.copy(busyAttachmentKey = null, attachmentProgress = null) }
+                try {
+                    mediaRepository.open(downloaded)
+                    showToast("Открываю «${downloaded.name}»")
+                } catch (openError: Exception) {
+                    // Нет приложения для ZIP/редкого формата — не теряем файл:
+                    // сразу кладём его в системные «Загрузки».
+                    mediaRepository.saveToDownloads(downloaded)
+                    showToast("Нечем открыть — сохранено в Загрузки: ${downloaded.name}")
+                }
             } catch (e: Exception) {
                 android.util.Log.e("ChatVM", "open attachment failed", e)
-                _uiState.update { it.copy(busyAttachmentKey = null) }
+                _uiState.update { it.copy(busyAttachmentKey = null, attachmentProgress = null) }
                 showToast("Не удалось открыть: ${e.message ?: "ошибка"}")
             }
         }
@@ -793,19 +802,19 @@ class ChatViewModel @Inject constructor(
         if (_uiState.value.busyAttachmentKey != null) return
         val key = attachmentKey(message.id, att)
         val label = attachmentLabel(att)
-        _uiState.update { it.copy(busyAttachmentKey = key) }
+        _uiState.update { it.copy(busyAttachmentKey = key, attachmentProgress = 0f) }
         showToast("Скачиваю «$label»…")
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val local = mediaRepository.fetch(message, att) { pct ->
-                    if (pct > 0 && pct < 100 && pct % 10 == 0) showToast("Скачиваю «$label»… $pct%")
+                    _uiState.update { it.copy(attachmentProgress = pct / 100f) }
                 }
                 mediaRepository.saveToDownloads(local)
-                _uiState.update { it.copy(busyAttachmentKey = null) }
+                _uiState.update { it.copy(busyAttachmentKey = null, attachmentProgress = null) }
                 showToast("Сохранено в Загрузки: ${local.name}")
             } catch (e: Exception) {
                 android.util.Log.e("ChatVM", "save attachment failed", e)
-                _uiState.update { it.copy(busyAttachmentKey = null) }
+                _uiState.update { it.copy(busyAttachmentKey = null, attachmentProgress = null) }
                 showToast("Не удалось сохранить: ${e.message ?: "ошибка"}")
             }
         }

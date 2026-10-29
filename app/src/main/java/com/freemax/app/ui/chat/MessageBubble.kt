@@ -91,7 +91,8 @@ fun MessageBubble(
     onSenderClick: (Long) -> Unit = {},
     onOpenAttachment: (Message, Attachment) -> Unit = { _, _ -> },
     onSaveAttachment: (Message, Attachment) -> Unit = { _, _ -> },
-    busyAttachmentKey: String? = null
+    busyAttachmentKey: String? = null,
+    attachmentProgress: Float? = null
 ) {
     val chatColors = LocalChatColors.current
 
@@ -281,6 +282,7 @@ fun MessageBubble(
                                 messageId = message.id,
                                 linkColor = linkColor,
                                 busyKey = busyAttachmentKey,
+                                attachmentProgress = attachmentProgress,
                                 onOpen = { onOpenAttachment(message, it) },
                                 onSave = { onSaveAttachment(message, it) }
                             )
@@ -311,6 +313,7 @@ fun MessageBubble(
                                 messageId = message.id,
                                 linkColor = linkColor,
                                 busyKey = busyAttachmentKey,
+                                attachmentProgress = attachmentProgress,
                                 onOpen = { onOpenAttachment(message, it) },
                                 onSave = { onSaveAttachment(message, it) }
                             )
@@ -546,6 +549,7 @@ private fun AttachmentsView(
     messageId: Long = 0L,
     linkColor: Color = Color.Unspecified,
     busyKey: String? = null,
+    attachmentProgress: Float? = null,
     onOpen: (Attachment) -> Unit = {},
     onSave: (Attachment) -> Unit = {}
 ) {
@@ -575,6 +579,7 @@ private fun AttachmentsView(
             att.isVideo -> VideoView(
                 att = att,
                 busy = busy,
+                progress = if (busy) attachmentProgress else null,
                 onOpen = { onOpen(att) },
                 onSave = { onSave(att) }
             )
@@ -583,6 +588,7 @@ private fun AttachmentsView(
                 att = att,
                 textColor = textColor,
                 busy = busy,
+                progress = if (busy) attachmentProgress else null,
                 onOpen = { onOpen(att) },
                 onSave = { onSave(att) }
             )
@@ -794,6 +800,7 @@ private fun PhotoGrid(
 private fun VideoView(
     att: Attachment,
     busy: Boolean = false,
+    progress: Float? = null,
     onOpen: () -> Unit = {},
     onSave: () -> Unit = {}
 ) {
@@ -833,11 +840,20 @@ private fun VideoView(
             contentAlignment = Alignment.Center
         ) {
             if (busy) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(26.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White
-                )
+                if (progress != null) {
+                    CircularProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.size(34.dp),
+                        strokeWidth = 2.5.dp,
+                        color = Color.White
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(26.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                }
             } else {
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
@@ -869,6 +885,7 @@ private fun FileView(
     att: Attachment,
     textColor: Color,
     busy: Boolean = false,
+    progress: Float? = null,
     onOpen: () -> Unit = {},
     onSave: () -> Unit = {}
 ) {
@@ -882,7 +899,15 @@ private fun FileView(
     ) {
         Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
             if (busy) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                if (progress != null) {
+                    CircularProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.5.dp
+                    )
+                } else {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
             } else {
                 Icon(
                     imageVector = Icons.Filled.Description,
@@ -908,14 +933,36 @@ private fun FileView(
                     color = textColor.copy(alpha = 0.6f)
                 )
             }
+            if (busy) {
+                Spacer(modifier = Modifier.height(4.dp))
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                    )
+                }
+            }
         }
         if (!busy) {
-            Icon(
-                imageVector = Icons.Filled.Download,
-                contentDescription = "Скачать и открыть",
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                modifier = Modifier.size(20.dp)
-            )
+            IconButton(
+                onClick = onSave,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Download,
+                    contentDescription = "Скачать в Загрузки",
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }

@@ -265,7 +265,11 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Column(modifier = Modifier.imePadding()) {
+            Column(
+                modifier = Modifier
+                    .imePadding()
+                    .navigationBarsPadding()
+            ) {
                 // Realtime typing indicator
                 val typing = uiState.typingText
                 if (typing != null) {
@@ -445,7 +449,8 @@ fun ChatScreen(
                                             onSenderClick = { uid -> onOpenContact(uid) },
                                             onOpenAttachment = { m, a -> viewModel.openAttachment(m, a) },
                                             onSaveAttachment = { m, a -> viewModel.saveAttachment(m, a) },
-                                            busyAttachmentKey = uiState.busyAttachmentKey
+                                            busyAttachmentKey = uiState.busyAttachmentKey,
+                                            attachmentProgress = uiState.attachmentProgress
                                         )
                                         DropdownMenu(
                                             expanded = menuMessage?.id == message.id,

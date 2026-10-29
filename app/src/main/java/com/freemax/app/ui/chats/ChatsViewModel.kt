@@ -3,9 +3,11 @@ package com.freemax.app.ui.chats
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freemax.api.model.Chat
+import com.freemax.app.core.network.NetworkMonitor
 import com.freemax.app.data.repository.AuthRepository
 import com.freemax.app.data.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,18 +23,32 @@ data class ChatsUiState(
     val accountName: String = "",
     /** Сумма непрочитанных по всем чатам. */
     val unreadTotal: Int = 0,
-    val online: Boolean = false
+    /** WebSocket активен (с задержкой, чтобы не мигать при реконнекте). */
+    val online: Boolean = false,
+    /** Есть ли на устройстве реальная сеть. */
+    val networkAvailable: Boolean = true
 )
 
 @HiltViewModel
 class ChatsViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val authRepository: AuthRepository,
-    private val maxClient: com.freemax.api.MaxClient
+    private val maxClient: com.freemax.api.MaxClient,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatsUiState())
     val uiState: StateFlow<ChatsUiState> = _uiState.asStateFlow()
+
+    // Короткие провалы сокета при реконнекте не должны выглядеть как офлайн.
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val stableConnectionActive = maxClient.state
+        .map { it.isActive() }
+        .distinctUntilChanged()
+        .transformLatest { active ->
+            if (!active) delay(2500)
+            emit(active)
+        }
 
     init {
         observeChats()
@@ -91,8 +107,9 @@ class ChatsViewModel @Inject constructor(
                 chatRepository.chats,
                 chatRepository.isLoading,
                 chatRepository.selfProfile,
-                maxClient.state
-            ) { chats, isLoading, self, conn ->
+                stableConnectionActive,
+                networkMonitor.available
+            ) { chats, isLoading, self, connectionActive, networkAvailable ->
                 val account = try { authRepository.accounts().firstOrNull { it.viewerId == authRepository.activeAccountId() } } catch (_: Exception) { null }
                 val displayName = account?.name?.takeIf { it.isNotBlank() }
                     ?: account?.phone?.takeIf { it.isNotBlank() }
@@ -107,7 +124,8 @@ class ChatsViewModel @Inject constructor(
                     accountInitials = initials.ifBlank { "MAX" },
                     accountName = displayName,
                     unreadTotal = chats.sumOf { it.newMessages },
-                    online = conn.isActive()
+                    online = connectionActive,
+                    networkAvailable = networkAvailable
                 )
             }.collect { state ->
                 _uiState.value = state

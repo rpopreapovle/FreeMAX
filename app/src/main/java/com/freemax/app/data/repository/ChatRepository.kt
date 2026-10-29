@@ -380,7 +380,7 @@ class ChatRepository @Inject constructor(
                     if (addedChat > 0) {
                         Log.d(TAG, "Added $addedChat from chat info, cache size=${contactsCache.size}")
                         lastChatsList?.let { list ->
-                            val updated = list.mapNotNull { parseChat(it, contactsCache) }
+                            val updated = list.mapNotNull { parseChat(it, contactsCache)?.let(::mergeChatIdentity) }
                             if (updated.isNotEmpty()) {
                                 _chats.value = applyLocalReadState(updated.sortedWith(compareByDescending<Chat> { secureStorage.isChatPinned(it.id) }.thenByDescending { it.lastEventTime }))
                                 Log.d(TAG, "Refreshed titles after chat info: ${updated.take(5).map { it.title }}")
@@ -450,7 +450,7 @@ class ChatRepository @Inject constructor(
         refreshMemberContactDetails()
         // Refresh titles with new contacts
         lastChatsList?.let { list ->
-            val updated = list.mapNotNull { parseChat(it, contactsCache) }
+            val updated = list.mapNotNull { parseChat(it, contactsCache)?.let(::mergeChatIdentity) }
             if (updated.isNotEmpty()) {
                 _chats.value = applyLocalReadState(updated.sortedWith(compareByDescending<Chat> { secureStorage.isChatPinned(it.id) }.thenByDescending { it.lastEventTime }))
                 Log.d(TAG, "Refreshed titles after contacts: ${updated.take(5).map { it.title }}")
@@ -484,7 +484,7 @@ class ChatRepository @Inject constructor(
 
             marker = if (nextMarker == "null" || nextMarker.isNullOrBlank()) null else nextMarker
 
-            val newChats = chatsList.mapNotNull { parseChat(it, contactsCache) }
+            val newChats = chatsList.mapNotNull { parseChat(it, contactsCache)?.let(::mergeChatIdentity) }
             val combinedRaw = if (isLoadMore) {
                 val existing = _chats.value
                 // Merge and dedup by id
@@ -550,9 +550,10 @@ class ChatRepository @Inject constructor(
             var changed = 0
             for (raw in chatsList) {
                 val parsed = parseChat(raw, contactsCache) ?: continue
-                val prev = byId[parsed.id]
-                if (prev == null || prev != parsed) {
-                    byId[parsed.id] = parsed
+                val prev = byId[parsed.id] ?: previousChatFor(parsed)
+                val mergedChat = preserveChatIdentity(parsed, prev)
+                if (prev == null || prev != mergedChat) {
+                    byId[parsed.id] = mergedChat
                     changed++
                 }
             }
@@ -605,9 +606,10 @@ class ChatRepository @Inject constructor(
         try {
             // GET_CHAT_INFO wraps into {chat:{...}}
             val map = (payload["chat"] as? Map<String, Any?>) ?: payload
-            val chat = parseChat(map) ?: return
+            val parsed = parseChat(map) ?: return
             val currentChats = _chats.value.toMutableList()
-            val index = currentChats.indexOfFirst { it.id == chat.id }
+            val index = currentChats.indexOfFirst { it.id == parsed.id }
+            val chat = preserveChatIdentity(parsed, currentChats.getOrNull(index))
             if (index >= 0) {
                 currentChats[index] = chat
             } else {
@@ -994,6 +996,29 @@ class ChatRepository @Inject constructor(
             }
         }
     }
+
+    /**
+     * Сервер иногда присылает DIALOG без title/icon (например, пока контакты
+     * ещё не догрузились). Не затираем уже известное имя и аватар плейсхолдером
+     * «Диалог» — иначе чат «теряет» имя при каждой перерисовке/рестарте.
+     */
+    private fun previousChatFor(chat: Chat): Chat? = _chats.value.firstOrNull { old ->
+        old.id == chat.id || old.cid == chat.cid ||
+            (chat.cid != 0L && old.id == chat.cid) || (old.cid != 0L && old.cid == chat.id)
+    }
+
+    private fun preserveChatIdentity(parsed: Chat, previous: Chat?): Chat {
+        if (previous == null) return parsed
+        val placeholder = parsed.title.isBlank() ||
+            parsed.title == "Диалог" || parsed.title == "Группа" || parsed.title == "Чат"
+        return parsed.copy(
+            title = if (placeholder && previous.title.isNotBlank()) previous.title else parsed.title,
+            iconUrl = parsed.iconUrl ?: previous.iconUrl
+        )
+    }
+
+    private fun mergeChatIdentity(parsed: Chat): Chat =
+        preserveChatIdentity(parsed, previousChatFor(parsed))
 
     /** Instantly clear the unread badge when a chat is opened/read. */
     fun markChatRead(chatId: Long) {
