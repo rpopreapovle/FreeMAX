@@ -24,9 +24,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.freemax.app.AppLockScreen
+import com.freemax.app.core.storage.SecureStorage
 import com.freemax.app.ui.chats.ChatAvatar
 import com.freemax.app.ui.theme.FreeMAXTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * Приём системного «Поделиться» из других приложений.
@@ -34,16 +37,30 @@ import dagger.hilt.android.AndroidEntryPoint
  */
 @AndroidEntryPoint
 class ShareActivity : ComponentActivity() {
+    @Inject lateinit var secureStorage: SecureStorage
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val payload = payloadFromIntent(intent)
         setContent {
             FreeMAXTheme {
-                ShareScreen(
-                    payload = payload,
-                    onClose = { finish() }
-                )
+                val lockEnabled by secureStorage.appLockFlow.collectAsState()
+                var unlocked by remember { mutableStateOf(false) }
+                if (lockEnabled && !unlocked) {
+                    AppLockScreen(
+                        check = { pin ->
+                            runCatching { secureStorage.checkAppLockPin(pin) }
+                                .getOrDefault(false)
+                        },
+                        onUnlocked = { unlocked = true }
+                    )
+                } else {
+                    ShareScreen(
+                        payload = payload,
+                        onClose = { finish() }
+                    )
+                }
             }
         }
     }
