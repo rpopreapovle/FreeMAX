@@ -277,7 +277,7 @@ fun MessageInput(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .defaultMinSize(minHeight = 40.dp),
+                                .defaultMinSize(minHeight = 44.dp),
                             contentAlignment = Alignment.CenterStart
                         ) {
                             BasicTextField(
