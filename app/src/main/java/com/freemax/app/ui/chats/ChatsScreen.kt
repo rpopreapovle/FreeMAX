@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ManageAccounts
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Refresh
@@ -35,6 +36,7 @@ fun ChatsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     var lastTopChatStamp by remember { mutableStateOf<String?>(null) }
+    var showOverflow by remember { mutableStateOf(false) }
     var menuChatId by remember { mutableStateOf<Long?>(null) }
     var deleteChatId by remember { mutableStateOf<Long?>(null) }
 
@@ -66,7 +68,7 @@ fun ChatsScreen(
                 title = {
                     Text(
                         text = "Чаты",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                     )
                 },
@@ -115,19 +117,43 @@ fun ChatsScreen(
                             contentDescription = "Поиск"
                         )
                     }
-                    IconButton(onClick = { viewModel.loadChats() }) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Обновить"
-                        )
-                    }
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(
-                                id = com.freemax.app.R.drawable.ic_settings_tabler
-                            ),
-                            contentDescription = "Настройки"
-                        )
+                    Box {
+                        IconButton(onClick = { showOverflow = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "Ещё"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showOverflow,
+                            onDismissRequest = { showOverflow = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Обновить") },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.Refresh, contentDescription = null)
+                                },
+                                onClick = {
+                                    viewModel.loadChats()
+                                    showOverflow = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Настройки") },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = androidx.compose.ui.res.painterResource(
+                                            id = com.freemax.app.R.drawable.ic_settings_tabler
+                                        ),
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    showOverflow = false
+                                    onSettingsClick()
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -292,10 +318,6 @@ fun ChatsScreen(
                                 )
                             }
                         }
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 81.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                        )
                     }
                 }
                 }

@@ -1,6 +1,14 @@
 package com.freemax.app.ui.chat
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -61,6 +69,7 @@ fun MessageInput(
     onPickCamera: () -> Unit = {}
 ) {
     var text by remember(draftKey) { mutableStateOf(initialText) }
+    var displayedReply by remember { mutableStateOf<Message?>(null) }
     val focusManager = LocalFocusManager.current
     var showAttachMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -117,6 +126,10 @@ fun MessageInput(
         }
     }
 
+    LaunchedEffect(replyTo) {
+        if (replyTo != null) displayedReply = replyTo
+    }
+
     fun doSend() {
         if ((text.isNotBlank() || pendingAttaches.isNotEmpty()) && !isUploading) {
             onSend(text)
@@ -131,42 +144,72 @@ fun MessageInput(
         shadowElevation = 10.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Reply preview
-            if (replyTo != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .padding(start = 12.dp, end = 4.dp, top = 7.dp, bottom = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(3.dp)
-                            .height(34.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.primary)
+            // Reply preview: Telegram-like compact bar with smooth reveal.
+            AnimatedVisibility(
+                visible = replyTo != null,
+                enter = fadeIn(tween(120)) +
+                    expandVertically(
+                        animationSpec = tween(180, easing = FastOutSlowInEasing),
+                        expandFrom = Alignment.Bottom
+                    ) +
+                    slideInVertically(tween(180)) { -it / 5 },
+                exit = fadeOut(tween(100)) +
+                    shrinkVertically(
+                        animationSpec = tween(150, easing = FastOutSlowInEasing),
+                        shrinkTowards = Alignment.Bottom
                     )
-                    Spacer(modifier = Modifier.width(9.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = replySenderName ?: "Сообщение",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = replyTo.text.ifBlank { "Вложение" },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    IconButton(onClick = onCancelReply) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Отменить ответ",
-                            modifier = Modifier.size(20.dp)
+            ) {
+                val shownReply = replyTo ?: displayedReply
+                if (shownReply != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(34.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                            Spacer(modifier = Modifier.width(9.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = replySenderName ?: "Сообщение",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = shownReply.text.ifBlank { "Вложение" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = onCancelReply,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "Отменить ответ",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                         )
                     }
                 }

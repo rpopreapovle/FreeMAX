@@ -12,7 +12,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Forward
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +26,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.freemax.app.ui.theme.LocalChatColors
@@ -428,7 +435,13 @@ fun ChatScreen(
                                 val message = item.message
                                 item(key = "msg-${message.id}") {
                                     val senderName = uiState.senderNames[message.userId]
-                                    Box {
+                                    BoxWithConstraints {
+                                        val menuOffset = DpOffset(
+                                            x = if (message.userId == uiState.viewerId) {
+                                                (maxWidth - 300.dp).coerceAtLeast(0.dp)
+                                            } else 8.dp,
+                                            y = 0.dp
+                                        )
                                         MessageBubble(
                                             message = message,
                                             isFromMe = message.userId == uiState.viewerId,
@@ -454,7 +467,9 @@ fun ChatScreen(
                                         )
                                         DropdownMenu(
                                             expanded = menuMessage?.id == message.id,
-                                            onDismissRequest = { menuMessage = null }
+                                            onDismissRequest = { menuMessage = null },
+                                            offset = menuOffset,
+                                            modifier = Modifier.widthIn(min = 240.dp, max = 320.dp)
                                         ) {
                                             // Быстрые реакции
                                             Row(
@@ -480,6 +495,9 @@ fun ChatScreen(
                                             HorizontalDivider()
                                             DropdownMenuItem(
                                                 text = { Text("Ответить") },
+                                                leadingIcon = {
+                                                    Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null)
+                                                },
                                                 onClick = {
                                                     viewModel.setReply(message)
                                                     menuMessage = null
@@ -488,6 +506,9 @@ fun ChatScreen(
                                             if (message.userId == uiState.viewerId && message.text.isNotBlank()) {
                                                 DropdownMenuItem(
                                                     text = { Text("Изменить") },
+                                                    leadingIcon = {
+                                                        Icon(Icons.Filled.Edit, contentDescription = null)
+                                                    },
                                                     onClick = {
                                                         editMessage = message
                                                         menuMessage = null
@@ -497,6 +518,9 @@ fun ChatScreen(
                                             if (message.text.isNotBlank()) {
                                                 DropdownMenuItem(
                                                     text = { Text("Копировать текст") },
+                                                    leadingIcon = {
+                                                        Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                                                    },
                                                     onClick = {
                                                         try {
                                                             context.getSystemService(android.content.ClipboardManager::class.java)
@@ -516,6 +540,9 @@ fun ChatScreen(
                                             if (downloadable != null) {
                                                 DropdownMenuItem(
                                                     text = { Text("Скачать в «Загрузки»") },
+                                                    leadingIcon = {
+                                                        Icon(Icons.Filled.Download, contentDescription = null)
+                                                    },
                                                     onClick = {
                                                         viewModel.saveAttachment(message, downloadable)
                                                         menuMessage = null
@@ -524,6 +551,9 @@ fun ChatScreen(
                                             }
                                             DropdownMenuItem(
                                                 text = { Text("Переслать") },
+                                                leadingIcon = {
+                                                    Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null)
+                                                },
                                                 onClick = {
                                                     forwardMessage = message
                                                     menuMessage = null
@@ -531,6 +561,13 @@ fun ChatScreen(
                                             )
                                             DropdownMenuItem(
                                                 text = { Text("Удалить", color = MaterialTheme.colorScheme.error) },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Filled.Delete,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                },
                                                 onClick = {
                                                     deleteMessage = message
                                                     menuMessage = null

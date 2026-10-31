@@ -32,15 +32,15 @@ data class ChatColors(
 
 val LightChatColors = ChatColors(
     dark = false,
-    background = Color(0xFFF2F5FA),
+    background = Color(0xFFF0F3F7),
     incomingBubble = Color(0xFFFFFFFF),
     incomingText = Color(0xFF15212B),
     incomingMuted = Color(0xFF6B7785),
-    incomingBorder = Color(0xFFE1E8F0),
-    outgoingBubble = Color(0xFF1F6FEB),
+    incomingBorder = Color(0xFFE4E9EF),
+    outgoingBubble = Color(0xFF3390EC),
     outgoingText = Color(0xFFFFFFFF),
     outgoingMuted = Color(0xCCFFFFFF),
-    unreadRow = Color(0xFFE7F0FF),
+    unreadRow = Color.Transparent,
     senderPalette = listOf(
         Color(0xFF1D5FA8), // синий
         Color(0xFF7B3FA0), // фиолетовый
@@ -57,15 +57,15 @@ val LightChatColors = ChatColors(
 
 val DarkChatColors = ChatColors(
     dark = true,
-    background = Color(0xFF0D1319),
-    incomingBubble = Color(0xFF19232D),
-    incomingText = Color(0xFFE9EFF5),
-    incomingMuted = Color(0xFF93A2B1),
-    incomingBorder = Color(0xFF283440),
-    outgoingBubble = Color(0xFF2C64B0),
+    background = Color(0xFF0E1621),
+    incomingBubble = Color(0xFF182533),
+    incomingText = Color(0xFFF1F4F7),
+    incomingMuted = Color(0xFF8A9AA8),
+    incomingBorder = Color(0xFF243447),
+    outgoingBubble = Color(0xFF2B5278),
     outgoingText = Color(0xFFF6FAFF),
     outgoingMuted = Color(0xBFF6FAFF),
-    unreadRow = Color(0xFF111C27),
+    unreadRow = Color.Transparent,
     senderPalette = listOf(
         Color(0xFF8CC5FF), // синий
         Color(0xFFD7A6F3), // фиолетовый

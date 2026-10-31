@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Forward
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocationOn
@@ -32,7 +31,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.Forward
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -162,7 +162,7 @@ fun MessageBubble(
             // стороны, чтобы не перекрывать сам пузырь.
             if (dragX < -16f) {
                 Icon(
-                    imageVector = Icons.Filled.Reply,
+                    imageVector = Icons.AutoMirrored.Filled.Reply,
                     contentDescription = null,
                     tint = if (isFromMe) chatColors.outgoingBubble else accent,
                     modifier = Modifier
@@ -220,13 +220,9 @@ fun MessageBubble(
                         .clip(shape)
                         .background(bubbleColor)
                         .then(
-                            if (isFromMe) Modifier else Modifier.border(
+                            if (isFromMe || chatColors.dark) Modifier else Modifier.border(
                                 width = 1.dp,
-                                color = lerp(
-                                    chatColors.incomingBorder,
-                                    accent,
-                                    if (chatColors.dark) 0.28f else 0.22f
-                                ),
+                                color = lerp(chatColors.incomingBorder, accent, 0.18f),
                                 shape = shape
                             )
                         )
@@ -243,17 +239,19 @@ fun MessageBubble(
                         Spacer(modifier = Modifier.height(3.dp))
                     }
 
-                    if (message.isForward) {
+                    // Reply оформляется компактным quote-блоком ниже.
+                    // Отдельную подпись «Ответ» не показываем — как в Telegram.
+                    if (message.isForward && message.forwardType != "REPLY") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = if (message.forwardType == "REPLY") Icons.Filled.Reply else Icons.Filled.Forward,
+                                imageVector = Icons.AutoMirrored.Filled.Forward,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
                                 tint = metaAccent
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (message.forwardType == "REPLY") "Ответ" else "Переслано",
+                                text = "Переслано",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = metaAccent
                             )
@@ -266,7 +264,11 @@ fun MessageBubble(
                             message = message,
                             textColor = textColor,
                             linkColor = linkColor,
-                            accent = accent
+                            accent = if (isFromMe) {
+                                chatColors.outgoingText.copy(alpha = 0.85f)
+                            } else {
+                                accent
+                            }
                         )
                         Spacer(modifier = Modifier.height(5.dp))
                     }
@@ -492,15 +494,15 @@ private fun QuoteView(message: Message, textColor: Color, linkColor: Color, acce
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(textColor.copy(alpha = 0.08f))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .clip(RoundedCornerShape(7.dp))
+            .background(textColor.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .width(3.dp)
-                .heightIn(min = 28.dp)
+                .heightIn(min = 26.dp)
                 .clip(RoundedCornerShape(2.dp))
                 .background(accent)
         )
@@ -534,7 +536,7 @@ private fun QuoteView(message: Message, textColor: Color, linkColor: Color, acce
                 color = textColor.copy(alpha = 0.85f),
                 linkColor = linkColor,
                 modifier = Modifier.weight(1f),
-                maxLines = 3,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 block = false
             )
