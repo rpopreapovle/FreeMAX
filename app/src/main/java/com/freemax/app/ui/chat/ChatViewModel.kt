@@ -193,6 +193,7 @@ class ChatViewModel @Inject constructor(
         // Clear the list badge immediately when opening the chat
         try { chatRepository.markChatRead(chatId) } catch (_: Exception) {}
         viewModelScope.launch {
+            try { maxClient.openChat(chatId) } catch (_: Exception) {}
             try { maxClient.subscribeChat(chatId) } catch (_: Exception) {}
         }
         // Synchronous: the repository sets its per-chat loading flag immediately,

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -20,11 +21,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.freemax.app.ui.theme.avatarBackground
@@ -74,13 +78,21 @@ private fun Avatar(
     online: Boolean = false,
     colorKey: Long = 0L
 ) {
+    var showPhoto by remember(photoUrl) { mutableStateOf(false) }
+    val hasPhoto = !photoUrl.isNullOrBlank()
     Box(modifier = Modifier.size(size.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(CircleShape)
                 .background(avatarBackground(colorKey, name))
-                .let { if (onClick != null) it.clickable(onClick = onClick) else it },
+                .let {
+                    when {
+                        onClick != null -> it.clickable(onClick = onClick)
+                        hasPhoto -> it.clickable { showPhoto = true }
+                        else -> it
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
             if (!photoUrl.isNullOrBlank()) {
@@ -113,6 +125,40 @@ private fun Avatar(
             )
         }
     }
+    if (showPhoto && hasPhoto) {
+        Dialog(
+            onDismissRequest = { showPhoto = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.94f))
+                    .clickable { showPhoto = false },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = "Аватар",
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.Fit
+                )
+                IconButton(
+                    onClick = { showPhoto = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Закрыть",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -123,6 +169,7 @@ fun ContactProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val contact by viewModel.contact.collectAsState()
+    val chats by viewModel.chats.collectAsState()
     val presence by viewModel.presence.collectAsState()
     val online by viewModel.online.collectAsState()
     val context = LocalContext.current
@@ -195,17 +242,18 @@ fun ContactProfileScreen(
             )
         }
         Spacer(modifier = Modifier.height(24.dp))
-        val dialog = remember(contact) {
+        val dialog = remember(chats, contactId) {
             viewModel.findDialogWith(contactId)
         }
-        if (dialog != null) {
-            Button(onClick = { onOpenDialog(dialog.id) }) {
-                Text("Открыть диалог")
-            }
-        } else {
+        Button(
+            onClick = { onOpenDialog(dialog?.id ?: contactId) }
+        ) {
+            Text(if (dialog != null) "Открыть диалог" else "Написать")
+        }
+        if (dialog == null) {
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Диалога пока нет. Начните переписку с другого клиента " +
-                    "(по номеру телефона) — после первого сообщения чат появится здесь.",
+                text = "Первый чат создастся после отправки сообщения.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
