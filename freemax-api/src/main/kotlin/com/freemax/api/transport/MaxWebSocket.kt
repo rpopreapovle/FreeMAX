@@ -23,7 +23,6 @@ class MaxWebSocket(
         private const val PING_INTERVAL_MS = 30_000L
         private const val RECONNECT_BASE_DELAY_MS = 2_000L
         private const val RECONNECT_MAX_DELAY_MS = 60_000L
-        private const val MAX_RECONNECT_ATTEMPTS = 20
         /**
          * Лог кадров в logcat. Приложение выставляет BuildConfig.DEBUG
          * в FreeMAXApp, чтобы в release payload'ы не попадали в логи.
@@ -167,6 +166,21 @@ class MaxWebSocket(
         webSocket = client.newWebSocket(request, listener)
     }
 
+    /** Принудительный реконнект: сбрасывает backoff и пересоздаёт сокет. */
+    fun reconnectNow() {
+        closedByClient = false
+        reconnectJob?.cancel()
+        reconnectJob = null
+        currentAttempt = 0
+        val stale = webSocket
+        webSocket = null
+        if (stale != null) {
+            try { stale.cancel() } catch (_: Exception) {}
+        }
+        _state.value = ConnectionState.Disconnected
+        connect()
+    }
+
     fun disconnect() {
         closedByClient = true
         reconnectJob?.cancel()
@@ -224,11 +238,6 @@ class MaxWebSocket(
             log("scheduleReconnect ignored, job already active")
             return
         }
-        if (currentAttempt >= MAX_RECONNECT_ATTEMPTS) {
-            _state.value = ConnectionState.Error("Max reconnect attempts exceeded")
-            return
-        }
-
         reconnectJob = scope.launch {
             reconnectLock.withLock {
                 if (closedByClient) return@withLock

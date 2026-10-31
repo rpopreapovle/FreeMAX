@@ -65,6 +65,14 @@ class MaxClient(
         webSocket.connect()
     }
 
+    /** Форсированный реконнект с сохранённым токеном (после смены сети/зависания). */
+    fun reconnectNow() {
+        loggedIn = false
+        _authed.value = false
+        awaitingLoginConfig = false
+        webSocket.reconnectNow()
+    }
+
     /**
      * Login with saved token (from WebView).
      * Sends LOGIN (opcode 6) with savedAuth — same as web client reconnect.

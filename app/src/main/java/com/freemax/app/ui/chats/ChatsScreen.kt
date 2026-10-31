@@ -168,7 +168,7 @@ fun ChatsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CircularProgressIndicator(
@@ -179,8 +179,12 @@ fun ChatsScreen(
                             Text(
                                 text = "Переподключение к MAX…",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
                             )
+                            TextButton(onClick = { viewModel.reconnect() }) {
+                                Text("Переподключиться")
+                            }
                         }
                     }
                 }

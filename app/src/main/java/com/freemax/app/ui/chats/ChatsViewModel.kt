@@ -3,6 +3,7 @@ package com.freemax.app.ui.chats
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freemax.api.model.Chat
+import com.freemax.api.protocol.ConnectionState
 import com.freemax.app.core.network.NetworkMonitor
 import com.freemax.app.data.repository.AuthRepository
 import com.freemax.app.data.repository.ChatRepository
@@ -72,6 +73,25 @@ class ChatsViewModel @Inject constructor(
                 }
             }
         }
+        // После смены Wi-Fi/мобильной сети старый DNS/сокет может остаться
+        // мёртвым. При появлении сети принудительно пересоздаём соединение.
+        viewModelScope.launch {
+            networkMonitor.available.collect { available ->
+                if (!available) return@collect
+                val state = maxClient.state.value
+                if (state is ConnectionState.Disconnected ||
+                    state is ConnectionState.Error ||
+                    state is ConnectionState.Reconnecting
+                ) {
+                    delay(800)
+                    maxClient.reconnectNow()
+                }
+            }
+        }
+    }
+
+    fun reconnect() {
+        try { maxClient.reconnectNow() } catch (_: Exception) {}
     }
 
     fun loadChats() {
